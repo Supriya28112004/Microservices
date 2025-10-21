@@ -1,0 +1,31 @@
+
+<!DOCTYPE html>
+<html>
+<head><title>WebSocket Test</title></head>
+<body>
+  <h1>WebSocket Invite Notification Test</h1>
+  <div id="messages"></div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js">
+
+  </script>
+  <script>
+
+    const socket = io("http://localhost:4002");
+
+    socket.on("connect", () => {
+      document.getElementById('messages').innerHTML += '<p>Connected to WebSocket server</p>';
+    });
+
+    socket.on("invite-notification", (data) => {
+      const messageElement = document.createElement('p');
+      messageElement.textContent = `Invite received: ${JSON.stringify(data)}`;
+      document.getElementById('messages').appendChild(messageElement);
+    });
+
+    socket.on("disconnect", () => {
+      document.getElementById('messages').innerHTML += '<p>Disconnected from WebSocket server</p>';
+    });
+  </script>
+</body>
+</html>
