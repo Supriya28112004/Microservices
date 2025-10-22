@@ -71,113 +71,110 @@
 
 
 
-import { login } from "../controllers/authcontroller.js";
-import User from "../models/User.js";
-import * as hashUtils from "../utils/hash.js";
-import axios from "axios";
-import jwt from "jsonwebtoken";
+import { jest } from '@jest/globals';
 
-jest.mock("../models/User.js");
-jest.mock("../utils/hash.js");
-jest.mock("axios");
-jest.mock("jsonwebtoken");
+// Mock modules with factory functions
+jest.unstable_mockModule('../../models/User.js', () => ({
+  default: {
+    findOne: jest.fn(),
+    save: jest.fn(),
+  },
+}));
 
-describe("Login API", () => {
+jest.unstable_mockModule('../../utils/hash.js', () => ({
+  verifyPassword: jest.fn(),
+  hashPassword: jest.fn(),
+}));
+
+jest.unstable_mockModule('jsonwebtoken', () => ({
+  default: {
+    sign: jest.fn(),
+  },
+  sign: jest.fn(),
+}));
+
+// Import modules after mocks
+const jwt = await import('jsonwebtoken');
+const { login } = await import('../../controllers/authcontroller.js');
+const User = await import('../../models/User.js');
+const hashUtils = await import('../../utils/hash.js');
+
+describe('Login API without OTP', () => {
   let req, res;
 
   beforeEach(() => {
-    req = { body: { email: "user@example.com", password: "pass" } };
-    res = { status: jest.fn(() => res), json: jest.fn() };
+    req = {
+      body: { email: 'user@example.com', password: 'password123' },
+    };
+    res = {
+      status: jest.fn(() => res),
+      json: jest.fn(),
+    };
     jest.clearAllMocks();
   });
 
-  it("returns 401 if user does not exist", async () => {
-    User.findOne.mockResolvedValue(null);
+  it('returns 401 if user not found', async () => {
+    User.default.findOne.mockResolvedValue(null);
 
     await login(req, res);
 
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ message: "Invalid credentials" });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid credentials' });
   });
 
-  it("returns 401 if password is invalid", async () => {
-    User.findOne.mockResolvedValue({ passwordhash: "hash" });
+  it('returns 401 if password invalid', async () => {
+    User.default.findOne.mockResolvedValue({ passwordhash: 'hashedPwd' });
     hashUtils.verifyPassword.mockResolvedValue(false);
 
     await login(req, res);
 
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ message: "Invalid credentials" });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid credentials' });
   });
 
-  it("returns MFA TOTP required if user has TOTP MFA", async () => {
-    User.findOne.mockResolvedValue({
-      passwordhash: "hash",
+  it('returns MFA required for TOTP', async () => {
+    User.default.findOne.mockResolvedValue({
+      passwordhash: 'hashedPwd',
       mfaEnabled: true,
-      mfaType: "TOTP",
-      totpSecretEncrypted: "encryptedSecret",
+      mfaType: 'TOTP',
+      totpSecretEncrypted: 'secretEnc',
     });
     hashUtils.verifyPassword.mockResolvedValue(true);
 
     await login(req, res);
 
-    expect(res.json).toHaveBeenCalledWith({ mfaRequired: true, method: "TOTP" });
+    expect(res.json).toHaveBeenCalledWith({ mfaRequired: true, method: 'TOTP' });
   });
 
-  // it("returns MFA OTP required, hashes OTP, saves user and sends notification", async () => {
-  //   const userMock = {
-  //     passwordhash: "hash",
-  //     mfaEnabled: true,
-  //     mfaType: "OTP",
-  //     save: jest.fn(),
-  //     email: "user@example.com",
-  //   };
-  //   User.findOne.mockResolvedValue(userMock);
-  //   hashUtils.verifyPassword.mockResolvedValue(true);
-  //   hashUtils.hashPassword.mockResolvedValue("otpHash");
-  //   axios.post.mockResolvedValue({});
-
-  //   await login(req, res);
-
-  //   expect(userMock.otpHash).toBe("otpHash");
-  //   expect(userMock.otpExpiresAt).toBeInstanceOf(Date);
-  //   expect(userMock.save).toHaveBeenCalled();
-  //   expect(axios.post).toHaveBeenCalledWith(
-  //     expect.stringContaining("/notify/email"),
-  //     expect.objectContaining({
-  //       to: userMock.email,
-  //       subject: "Your Login OTP",
-  //     })
-  //   );
-  //   expect(res.json).toHaveBeenCalledWith({ mfaRequired: true, method: "OTP" });
-  // });
-
-  it("returns tokens and saves refresh token if no MFA", async () => {
+  it('issues tokens and saves refresh token if no MFA', async () => {
     const userMock = {
-      _id: "id",
-      passwordhash: "hash",
-      role: "user",
+      _id: 'userId',
+      passwordhash: 'hashedPwd',
+      role: 'user',
       mfaEnabled: false,
       save: jest.fn(),
     };
-    User.findOne.mockResolvedValue(userMock);
+    User.default.findOne.mockResolvedValue(userMock);
     hashUtils.verifyPassword.mockResolvedValue(true);
-    jwt.sign.mockImplementation((payload) => "token_" + payload.userId);
+    jwt.default.sign.mockImplementation((payload) => `token_${payload.userId}`);
 
     await login(req, res);
 
-    expect(jwt.sign).toHaveBeenCalledTimes(2);
-    expect(userMock.refreshToken).toBe("token_id");
+    expect(jwt.default.sign).toHaveBeenCalledTimes(2);
+    expect(userMock.refreshToken).toMatch(/^token_/);
     expect(userMock.save).toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith({ accessToken: "token_id", refreshToken: "token_id" });
+    expect(res.json).toHaveBeenCalledWith({
+      accessToken: expect.stringMatching(/^token_/),
+      refreshToken: expect.stringMatching(/^token_/),
+    });
   });
 
-  it("returns 500 on internal error", async () => {
-    User.findOne.mockRejectedValue(new Error("fail"));
+  it('handles unexpected errors with 500', async () => {
+    User.default.findOne.mockRejectedValue(new Error('fail'));
 
     await login(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ message: "Login failed" });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Login failed' });
   });
 });

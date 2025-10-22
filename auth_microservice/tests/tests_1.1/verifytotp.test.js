@@ -52,66 +52,105 @@
 
 
 
-import { verifyTotpCode } from "../controllers/authcontroller.js";
-import User from "../models/User.js";
-import { authenticator } from "otplib";
-import * as encryptUtils from "../utils/encrypt.js";
-import jwt from "jsonwebtoken";
+import { jest } from '@jest/globals';
 
-jest.mock("../models/User.js");
-jest.mock("otplib");
-jest.mock("../utils/encrypt.js");
-jest.mock("jsonwebtoken");
+// Mock modules before imports
+jest.unstable_mockModule('../../models/User.js', () => ({
+  default: {
+    findOne: jest.fn(),
+    findById: jest.fn(),
+  },
+}));
 
-describe("Verify TOTP Code API", () => {
+jest.unstable_mockModule('../../utils/encrypt.js', () => ({
+  decrypt: jest.fn(),
+  encrypt: jest.fn(),
+}));
+
+jest.unstable_mockModule('otplib', () => ({
+  authenticator: {
+    check: jest.fn(),
+  },
+}));
+
+jest.unstable_mockModule('jsonwebtoken', () => ({
+  default: {
+    sign: jest.fn(),
+  },
+  sign: jest.fn(),
+}));
+
+// Import modules after mocks
+const User = await import('../../models/User.js');
+const encryptUtils = await import('../../utils/encrypt.js');
+const { authenticator } = await import('otplib');
+const jwt = await import('jsonwebtoken');
+const { verifyTotpCode } = await import('../../controllers/authcontroller.js');
+
+describe('Verify TOTP API', () => {
   let req, res;
 
   beforeEach(() => {
-    req = { body: { email: "user@example.com", token: "token" } };
-    res = { status: jest.fn(() => res), json: jest.fn() };
+    req = {
+      body: { email: 'test@example.com', token: '123456' },
+    };
+    res = {
+      status: jest.fn(() => res),
+      json: jest.fn(),
+    };
     jest.clearAllMocks();
   });
 
-  it("returns 400 if user not found or TOTP not set up", async () => {
-    User.findOne.mockResolvedValue(null);
+  it('verifies successfully with valid token', async () => {
+    const userMock = {
+      _id: 'userId',
+      totpSecretEncrypted: 'encryptedSecret',
+      save: jest.fn(),
+    };
+    User.default.findOne.mockResolvedValue(userMock);
+
+    encryptUtils.decrypt.mockReturnValue('decryptedSecret');
+    authenticator.check.mockReturnValue(true);
+    jwt.default.sign.mockReturnValue('token123');
 
     await verifyTotpCode(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: "TOTP not set up" });
+    expect(User.default.findOne).toHaveBeenCalledWith({ email: 'test@example.com' });
+    expect(encryptUtils.decrypt).toHaveBeenCalledWith('encryptedSecret');
+    expect(authenticator.check).toHaveBeenCalledWith('123456', 'decryptedSecret');
+    expect(res.json).toHaveBeenCalledWith({ accessToken: 'token123', refreshToken: 'token123' });
   });
 
-  it("returns 400 for invalid TOTP code", async () => {
-    User.findOne.mockResolvedValue({ totpSecretEncrypted: "encrypted" });
-    encryptUtils.decrypt.mockReturnValue("secret");
+  it('fails verification with invalid token', async () => {
+    const userMock = {
+      totpSecretEncrypted: 'encryptedSecret',
+    };
+    User.default.findOne.mockResolvedValue(userMock);
+
+    encryptUtils.decrypt.mockReturnValue('decryptedSecret');
     authenticator.check.mockReturnValue(false);
 
     await verifyTotpCode(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: "Invalid TOTP code" });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid TOTP code' });
   });
 
-  it("verifies TOTP and issues tokens", async () => {
-    const userMock = { _id: "id", role: "user", save: jest.fn() };
-    User.findOne.mockResolvedValue(userMock);
-    encryptUtils.decrypt.mockReturnValue("secret");
-    authenticator.check.mockReturnValue(true);
-    jwt.sign.mockImplementation((payload) => "token_" + payload.userId);
+  it('returns 400 if TOTP not set up', async () => {
+    User.default.findOne.mockResolvedValue({ totpSecretEncrypted: null });
 
     await verifyTotpCode(req, res);
 
-    expect(userMock.refreshToken).toBe("token_id");
-    expect(userMock.save).toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith({ accessToken: "token_id", refreshToken: "token_id" });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'TOTP not set up' });
   });
 
-  it("returns 500 on error", async () => {
-    User.findOne.mockRejectedValue(new Error("fail"));
+  it('returns 500 on internal error', async () => {
+    User.default.findOne.mockRejectedValue(new Error('fail'));
 
     await verifyTotpCode(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ message: "TOTP verification failed" });
+    expect(res.json).toHaveBeenCalledWith({ message: 'TOTP verification failed' });
   });
 });

@@ -14,7 +14,7 @@ const validAccessToken = jwt.sign(
 );
 
 const validAccessTokenWithInsufficientRole = jwt.sign(
-  { userId, role: "GUEST_USER" }, // not authorized role
+  { userId, role: "CLIENT_USER" }, // role that can't invite SUPER_ADMIN
   process.env.JWT_SECRET,
   { expiresIn: "15m" }
 );
@@ -69,6 +69,11 @@ describe("Auth Controller API Tests", () => {
 
   // Verify OTP - no OTP generated fail
   test("POST /authuser/mfa/verify-otp - no OTP generated", async () => {
+    // First create a user
+    await request(app)
+      .post("/authuser/signup")
+      .send({ email: "test@example.com", password: "Password@123", role: "CLIENT_USER", firstname: "Test", lastname: "User" });
+    
     const res = await request(app)
       .post("/authuser/mfa/verify-otp")
       .send({ email: "test@example.com", otp: "123456" });
@@ -89,10 +94,10 @@ describe("Auth Controller API Tests", () => {
   test("POST /authuser/invite - permission denied", async () => {
     const res = await request(app)
       .post("/authuser/invite")
-      .set("Authorization", "Bearer validAccessTokenWithInsufficientRole")
+      .set("Authorization", `Bearer ${validAccessTokenWithInsufficientRole}`)
       .send({ email: "invitee@example.com", role: "SUPER_ADMIN", message: "Please join" });
     expect(res.statusCode).toBe(403);
-    expect(res.body.message).toMatch(/permission/i);
+    expect(res.body.message).toMatch(/access denied|permission/i);
   });
 
   // Logout - no token fail

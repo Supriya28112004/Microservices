@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { authenticator } from "otplib";
 import { PERMISSIONS } from "../../shared/constants/roles.js";
 import amqp from "amqplib";
+import mongoose from "mongoose";
 
 
 // Helper to generate numeric OTP

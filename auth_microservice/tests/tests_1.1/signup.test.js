@@ -42,20 +42,31 @@
 
 
 
-import { hashPassword } from "../../utils/hash.js";
-import User from "../../models/User.js";
-import { signup } from "../../controllers/authcontroller.js";
 import { jest } from '@jest/globals';
 
-jest.mock("../../utils/hash.js");
-jest.mock("../../models/User.js");
+// Mock modules with factories
+jest.unstable_mockModule('../../utils/hash.js', () => ({
+  hashPassword: jest.fn(),
+  verifyPassword: jest.fn(),
+}));
 
-describe("Signup API", () => {
+jest.unstable_mockModule('../../models/User.js', () => ({
+  default: {
+    create: jest.fn(),
+  },
+}));
+
+// Import modules after mocking
+const { signup } = await import('../../controllers/authcontroller.js');
+const User = await import('../../models/User.js');
+const { hashPassword } = await import('../../utils/hash.js');
+
+describe('Signup API', () => {
   let req, res;
 
   beforeEach(() => {
     req = {
-      body: { email: "test@example.com", password: "pass123", role: "user", firstname: "John", lastname: "Doe" },
+      body: { email: 'test@example.com', password: 'pass123', role: 'user', firstname: 'John', lastname: 'Doe' },
     };
     res = {
       status: jest.fn(() => res),
@@ -64,30 +75,30 @@ describe("Signup API", () => {
     jest.clearAllMocks();
   });
 
-  it("should successfully signup a user", async () => {
-    hashPassword.mockResolvedValue("hashedPass");  // direct mocked function override
-    User.create.mockResolvedValue({ _id: "userId" });
+  it('should successfully signup a user', async () => {
+    hashPassword.mockResolvedValue('hashedPass');
+    User.default.create.mockResolvedValue({ _id: 'userId' });
 
     await signup(req, res);
 
     expect(hashPassword).toHaveBeenCalledWith(req.body.password);
-    expect(User.create).toHaveBeenCalledWith({
+    expect(User.default.create).toHaveBeenCalledWith({
       email: req.body.email,
-      passwordhash: "hashedPass",
+      passwordhash: 'hashedPass',
       role: req.body.role,
       firstname: req.body.firstname,
       lastname: req.body.lastname,
     });
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.json).toHaveBeenCalledWith({ message: "User registered", userId: "userId" });
+    expect(res.json).toHaveBeenCalledWith({ message: 'User registered', userId: 'userId' });
   });
 
-  it("should handle errors gracefully", async () => {
-    hashPassword.mockRejectedValue(new Error("fail"));
+  it('should handle errors gracefully', async () => {
+    hashPassword.mockRejectedValue(new Error('fail'));
 
     await signup(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ message: "Signup failed" });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Signup failed' });
   });
 });
