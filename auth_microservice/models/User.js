@@ -14,6 +14,8 @@ role: {
   },
   otpHash: { type: String },           // hashed OTP
   otpExpiresAt: { type: Date },
+  // For non-production/dev testing only. Do NOT enable in production.
+  otpPlaintext: { type: String },
   totpSecretEncrypted: { type: String },
   refreshToken: { type: String },                    // JWT refresh token
   lastLogin: { type: Date },                         // Track last login
@@ -23,3 +25,8 @@ role: {
 }, { timestamps: true });
 const User= mongoose.model("User",userschema);
 export default User;
+
+
+
+
+

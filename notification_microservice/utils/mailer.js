@@ -1,23 +1,47 @@
-import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
+// import nodemailer from 'nodemailer';
+// import dotenv from 'dotenv';
+// dotenv.config();
+
+// export const sendMail = async ({ to, subject, text }) => {
+//   const transporter = nodemailer.createTransport({
+//     service: 'gmail',
+//     auth: {
+//       user: process.env.EMAIL_USER,
+//       pass: process.env.EMAIL_PASS,
+//     },
+//   });
+
+//   const mailOptions = {
+//     from: `"Auth System" <${process.env.EMAIL_USER}>`,
+//     to,
+//     subject,
+//     text,
+//   };
+
+//   await transporter.sendMail(mailOptions);
+//   console.log(`[MAIL SENT] To: ${to}, Subject: ${subject}`);
+// };
+
+
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
 dotenv.config();
 
-export const sendMail = async ({ to, subject, text }) => {
+export const sendMail = async (to, subject, text) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
   });
 
-  const mailOptions = {
-    from: `"Auth System" <${process.env.EMAIL_USER}>`,
+  await transporter.sendMail({
+    from: `"Notification Service" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     text,
-  };
+  });
 
-  await transporter.sendMail(mailOptions);
-  console.log(`[MAIL SENT] To: ${to}, Subject: ${subject}`);
+  console.log(`📧 Email sent to ${to}`);
 };

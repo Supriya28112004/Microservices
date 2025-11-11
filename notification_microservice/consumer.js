@@ -22,12 +22,48 @@ export const startConsumer = async (onInvite) => {
           const data = JSON.parse(msg.content.toString());
           console.log(`[Received Invite]`, data);
 
+        
+            //  ## added ## Handle based on invite type
+          let emailSubject = "";
+          let emailText = "";
+
+          if (data.type === "INVITE_CREATED") {
+            emailSubject = "New Invite";
+            emailText = "A new invite has been created for you.";
+          } 
+          else if (data.type === "INVITE_ACCEPTED") {
+            emailSubject = "Invite Accepted";
+            emailText = "Your invite has been accepted.";
+          } 
+          else if (data.type === "INVITE_REJECTED") {
+            emailSubject = "Invite Rejected";
+            emailText = "Your invite has been rejected.";
+          }
+
+
+
+
+
+
+
+
           // Send the email as before
-          await sendMail({
+          // await sendMail({
+          //   to: data.email,
+          //   subject: data.subject || "You're Invited",
+          //   text: data.message || `You've been invited with role: ${data.role}`,
+          // }); ## added below 
+
+        await sendMail({
             to: data.email,
-            subject: data.subject || "You're Invited",
-            text: data.message || `You've been invited with role: ${data.role}`,
+            subject: emailSubject,
+            text: emailText,
           });
+        
+
+
+
+
 
           // If a callback is provided (e.g., to emit with Socket.IO), call it
           if (typeof onInvite === 'function') {

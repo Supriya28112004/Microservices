@@ -1,6 +1,6 @@
 // src/controllers/emailController.js
-import EmailProviderAdapter from "../adapters/emailProviderAdapter.js";
+import EmailProviderAdapter from "../adapters/emailadapter.js";
 
-export const sendEmail = async (to, subject, text) => {
+export const sendMail = async (to, subject, text) => {
   return await EmailProviderAdapter.sendEmail(to, subject, text);
 };

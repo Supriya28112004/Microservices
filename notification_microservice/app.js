@@ -1,6 +1,6 @@
 // src/app.js
 import express from "express";
-import emailRoutes from "./routes/email.js";
+import emailRoutes from "./routes/emailRoute.js";
 import logger from "../../shared/middleware/logger.js";
 
 const app = express();
